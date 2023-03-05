@@ -286,7 +286,7 @@ class Exporter:
     @try_export
     def _export_onnx(self, prefix=colorstr('ONNX:')):
         # YOLOv8 ONNX export
-        check_requirements('onnx>=1.12.0')
+        # check_requirements('onnx>=1.12.0')
         import onnx  # noqa
 
         LOGGER.info(f'\n{prefix} starting export with onnx {onnx.__version__}...')

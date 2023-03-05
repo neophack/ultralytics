@@ -413,6 +413,8 @@ class BaseTrainer:
             weights, ckpt = attempt_load_one_weight(model)
             cfg = ckpt["model"].yaml
         else:
+            weights, ckpt = attempt_load_one_weight("/workspace/peng/ultralytics/yolov5nu.pt")
+            # weights, ckpt = attempt_load_one_weight("/workspace/peng/ultralytics/runs/segment/train11/weights/best.pt")
             cfg = model
         self.model = self.get_model(cfg=cfg, weights=weights)  # calls Model(cfg, weights)
         return ckpt
