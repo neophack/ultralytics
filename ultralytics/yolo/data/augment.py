@@ -562,9 +562,9 @@ class Albumentations:
                 A.MedianBlur(p=0.01),
                 A.ToGray(p=0.01),
                 A.CLAHE(p=0.01),
-                A.RandomBrightnessContrast(p=0.0),
-                A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=75, p=0.0),]  # transforms
+                A.RandomBrightnessContrast(p=0.01),
+                A.RandomGamma(p=0.01),
+                A.ImageCompression(quality_lower=75, p=0.01),]  # transforms
             self.transform = A.Compose(T, bbox_params=A.BboxParams(format="yolo", label_fields=["class_labels"]))
 
             LOGGER.info(prefix + ", ".join(f"{x}".replace("always_apply=False, ", "") for x in T if x.p))
