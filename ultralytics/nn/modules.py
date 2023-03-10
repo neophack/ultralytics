@@ -350,13 +350,15 @@ class Proto(nn.Module):
     # YOLOv8 mask Proto module for segmentation models
     def __init__(self, c1, c_=256, c2=32):  # ch_in, number of protos, number of masks
         super().__init__()
+        self.upsample1 = nn.ConvTranspose2d(c1, c1, 2, 2, 0, bias=True) 
         self.cv1 = Conv(c1, c_, k=3)
-        self.upsample = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True)  # nn.Upsample(scale_factor=2, mode='nearest')
+        self.upsample2 = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True)  # nn.Upsample(scale_factor=2, mode='nearest')
         self.cv2 = Conv(c_, c_, k=3)
+        self.upsample3 = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True) 
         self.cv3 = Conv(c_, c2)
 
     def forward(self, x):
-        return self.cv3(self.cv2(self.upsample(self.cv1(x))))
+        return self.cv3(self.upsample3(self.cv2(self.upsample2(self.cv1(self.upsample1(x))))))
 
 
 class Ensemble(nn.ModuleList):
