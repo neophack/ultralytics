@@ -1,11 +1,14 @@
-site_name: Ultralytics YOLOv8 Docs
+# Ultralytics YOLO 🚀, GPL-3.0 license
+
+site_name: YOLOv8 Docs
 repo_url: https://github.com/ultralytics/ultralytics
 edit_uri: https://github.com/ultralytics/ultralytics/tree/main/docs
 repo_name: ultralytics/ultralytics
+remote_name: https://github.com/ultralytics/docs
 
 theme:
   name: "material"
-  logo: https://github.com/ultralytics/assets/raw/main/logo/Ultralytics-logomark-white.png
+  logo: https://github.com/ultralytics/assets/raw/main/logo/Ultralytics_Logotype_Reverse.svg
   favicon: https://github.com/ultralytics/assets/raw/main/logo/favicon-yolo.ico
   font:
     text: Roboto
@@ -102,13 +105,15 @@ nav:
   - Tasks:
       - Detection: tasks/detection.md
       - Segmentation: tasks/segmentation.md
+      - Multi-Object Tracking: tasks/tracking.md
       - Classification: tasks/classification.md
   - Usage:
       - CLI: cli.md
       - Python: python.md
       - Predict: predict.md
       - Configuration: cfg.md
-      - Customization Guide: engine.md
+      - Customization using callbacks: callbacks.md
+      - Advanced customization: engine.md
   - Ultralytics HUB: hub.md
   - iOS and Android App: app.md
   - Reference:
@@ -121,3 +126,4 @@ nav:
           - Results: reference/results.md
       - ultralytics.nn: reference/nn.md
       - Operations: reference/ops.md
+  - Security: SECURITY.md

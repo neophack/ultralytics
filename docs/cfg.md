@@ -55,7 +55,7 @@ include train, val, and predict.
 | mode   | 'train'  | YOLO mode, i.e. train, val, predict, or export                                                |
 | resume | False    | resume training from last checkpoint or custom checkpoint if passed as resume=path/to/best.pt |
 | model  | null     | path to model file, i.e. yolov8n.pt, yolov8n.yaml                                             |
-| data   | null     | path to data file, i.e. i.e. coco128.yaml                                                     |
+| data   | null     | path to data file, i.e. coco128.yaml                                                          |
 
 ### Training
 
@@ -69,12 +69,13 @@ task.
 | Key             | Value  | Description                                                                    |
 |-----------------|--------|--------------------------------------------------------------------------------|
 | model           | null   | path to model file, i.e. yolov8n.pt, yolov8n.yaml                              |
-| data            | null   | path to data file, i.e. i.e. coco128.yaml                                      |
+| data            | null   | path to data file, i.e. coco128.yaml                                           |
 | epochs          | 100    | number of epochs to train for                                                  |
 | patience        | 50     | epochs to wait for no observable improvement for early stopping of training    |
 | batch           | 16     | number of images per batch (-1 for AutoBatch)                                  |
 | imgsz           | 640    | size of input images as integer or w,h                                         |
 | save            | True   | save train checkpoints and predict results                                     |
+| save_period     | -1     | Save checkpoint every x epochs (disabled if < 1)                               |
 | cache           | False  | True/ram, disk or False. Use cache for data loading                            |
 | device          | null   | device to run on, i.e. cuda device=0 or device=0,1,2,3 or device=cpu           |
 | workers         | 8      | number of worker threads for data loading (per RANK if DDP)                    |
@@ -109,7 +110,6 @@ task.
 | mask_ratio      | 4      | mask downsample ratio (segment train only)                                     |
 | dropout         | 0.0    | use dropout regularization (classify train only)                               |
 | val             | True   | validate/test during training                                                  |
-| min_memory      | False  | minimize memory footprint loss function, choices=[False, True, <roll_out_thr>] |
 
 ### Prediction
 
@@ -129,6 +129,7 @@ given task.
 | half           | False                | use half precision (FP16)                                |
 | device         | null                 | device to run on, i.e. cuda device=0/1/2/3 or device=cpu |
 | show           | False                | show results if possible                                 |
+| save           | False                | save images with results                                 |
 | save_txt       | False                | save results as .txt file                                |
 | save_conf      | False                | save results with confidence scores                      |
 | save_crop      | False                | save cropped images with results                         |
@@ -154,18 +155,19 @@ process include the size and composition of the validation dataset and the speci
 is important to carefully tune and experiment with these settings to ensure that the model is performing well on the
 validation dataset and to detect and prevent overfitting.
 
-| Key         | Value | Description                                                     |
-|-------------|-------|-----------------------------------------------------------------|
-| save_json   | False | save results to JSON file                                       |
-| save_hybrid | False | save hybrid version of labels (labels + additional predictions) |
-| conf        | 0.001 | object confidence threshold for detection                       |
-| iou         | 0.6   | intersection over union (IoU) threshold for NMS                 |
-| max_det     | 300   | maximum number of detections per image                          |
-| half        | True  | use half precision (FP16)                                       |
-| device      | null  | device to run on, i.e. cuda device=0/1/2/3 or device=cpu        |
-| dnn         | False | use OpenCV DNN for ONNX inference                               |
-| plots       | False | show plots during training                                      |
-| rect        | False | support rectangular evaluation                                  |
+| Key         | Value | Description                                                        |
+|-------------|-------|--------------------------------------------------------------------|
+| save_json   | False | save results to JSON file                                          |
+| save_hybrid | False | save hybrid version of labels (labels + additional predictions)    |
+| conf        | 0.001 | object confidence threshold for detection                          |
+| iou         | 0.6   | intersection over union (IoU) threshold for NMS                    |
+| max_det     | 300   | maximum number of detections per image                             |
+| half        | True  | use half precision (FP16)                                          |
+| device      | null  | device to run on, i.e. cuda device=0/1/2/3 or device=cpu           |
+| dnn         | False | use OpenCV DNN for ONNX inference                                  |
+| plots       | False | show plots during training                                         |
+| rect        | False | support rectangular evaluation                                     |
+| split       | val   | dataset split to use for validation, i.e. 'val', 'test' or 'train' |
 
 ### Export
 
