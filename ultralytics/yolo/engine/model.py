@@ -24,7 +24,10 @@ MODEL_MAP = {
         'yolo.TYPE.detect.DetectionPredictor'],
     'segment': [
         SegmentationModel, 'yolo.TYPE.segment.SegmentationTrainer', 'yolo.TYPE.segment.SegmentationValidator',
-        'yolo.TYPE.segment.SegmentationPredictor']}
+        'yolo.TYPE.segment.SegmentationPredictor'],
+    'hotpoint': [
+        SegmentationModel, 'yolo.TYPE.hotpoint.HotpointTrainer', 'yolo.TYPE.hotpoint.HotpointValidator',
+        'yolo.TYPE.hotpoint.HotpointPredictor']}
 
 
 class YOLO:

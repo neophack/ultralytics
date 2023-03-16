@@ -7,7 +7,7 @@ from typing import List
 
 import numpy as np
 
-from .ops import ltwh2xywh, ltwh2xyxy, resample_segments, xywh2ltwh, xywh2xyxy, xyxy2ltwh, xyxy2xywh
+from .ops import ltwh2xywh, ltwh2xyxy, resample_segments, resample_hotpoints, xywh2ltwh, xywh2xyxy, xyxy2ltwh, xyxy2xywh
 
 
 # From PyTorch internals
@@ -164,7 +164,7 @@ class Bboxes:
 
 class Instances:
 
-    def __init__(self, bboxes, segments=None, keypoints=None, bbox_format='xywh', normalized=True) -> None:
+    def __init__(self, bboxes, segments=None, keypoints=None, hotpoints=None, bbox_format='xywh', normalized=True) -> None:
         """
         Args:
             bboxes (ndarray): bboxes with shape [N, 4].
@@ -173,6 +173,9 @@ class Instances:
         """
         if segments is None:
             segments = []
+        if hotpoints is None:
+            hotpoints = []
+
         self._bboxes = Bboxes(bboxes=bboxes, format=bbox_format)
         self.keypoints = keypoints
         self.normalized = normalized
@@ -185,6 +188,14 @@ class Instances:
         else:
             segments = np.zeros((0, 1000, 2), dtype=np.float32)
         self.segments = segments
+        if len(hotpoints) > 0:
+            # list[np.array(100, 3)] * num_samples
+            hotpoints = resample_hotpoints(hotpoints)
+            # (N, 100, 3)
+            hotpoints = np.stack(hotpoints, axis=0)
+        else:
+            hotpoints = np.zeros((0, 100, 3), dtype=np.float32)
+        self.hotpoints = hotpoints
 
     def convert_bbox(self, format):
         self._bboxes.convert(format=format)
@@ -202,6 +213,9 @@ class Instances:
         if self.keypoints is not None:
             self.keypoints[..., 0] *= scale_w
             self.keypoints[..., 1] *= scale_h
+        if self.hotpoints is not None:
+            self.hotpoints[..., 0] *= scale_w
+            self.hotpoints[..., 1] *= scale_h
 
     def denormalize(self, w, h):
         if not self.normalized:
@@ -212,6 +226,9 @@ class Instances:
         if self.keypoints is not None:
             self.keypoints[..., 0] *= w
             self.keypoints[..., 1] *= h
+        if self.hotpoints is not None:
+            self.hotpoints[..., 0] *= w
+            self.hotpoints[..., 1] *= h
         self.normalized = False
 
     def normalize(self, w, h):
@@ -223,6 +240,9 @@ class Instances:
         if self.keypoints is not None:
             self.keypoints[..., 0] /= w
             self.keypoints[..., 1] /= h
+        if self.hotpoints is not None:
+            self.hotpoints[..., 0] /= w
+            self.hotpoints[..., 1] /= h
         self.normalized = True
 
     def add_padding(self, padw, padh):
@@ -234,6 +254,9 @@ class Instances:
         if self.keypoints is not None:
             self.keypoints[..., 0] += padw
             self.keypoints[..., 1] += padh
+        if self.hotpoints is not None:
+            self.hotpoints[..., 0] += padw
+            self.hotpoints[..., 1] += padh
 
     def __getitem__(self, index) -> 'Instances':
         """
@@ -245,12 +268,14 @@ class Instances:
         """
         segments = self.segments[index] if len(self.segments) else self.segments
         keypoints = self.keypoints[index] if self.keypoints is not None else None
+        hotpoints = self.hotpoints[index] if len(self.hotpoints) else self.hotpoints
         bboxes = self.bboxes[index]
         bbox_format = self._bboxes.format
         return Instances(
             bboxes=bboxes,
             segments=segments,
             keypoints=keypoints,
+            hotpoints=hotpoints,
             bbox_format=bbox_format,
             normalized=self.normalized,
         )
@@ -266,6 +291,8 @@ class Instances:
         self.segments[..., 1] = h - self.segments[..., 1]
         if self.keypoints is not None:
             self.keypoints[..., 1] = h - self.keypoints[..., 1]
+        if self.hotpoints is not None:
+            self.hotpoints[..., 1] = h - self.hotpoints[..., 1]
 
     def fliplr(self, w):
         if self._bboxes.format == 'xyxy':
@@ -278,6 +305,8 @@ class Instances:
         self.segments[..., 0] = w - self.segments[..., 0]
         if self.keypoints is not None:
             self.keypoints[..., 0] = w - self.keypoints[..., 0]
+        if self.hotpoints is not None:
+            self.hotpoints[..., 0] = w - self.hotpoints[..., 0]
 
     def clip(self, w, h):
         ori_format = self._bboxes.format
@@ -291,14 +320,19 @@ class Instances:
         if self.keypoints is not None:
             self.keypoints[..., 0] = self.keypoints[..., 0].clip(0, w)
             self.keypoints[..., 1] = self.keypoints[..., 1].clip(0, h)
+        if self.hotpoints is not None:
+            self.hotpoints[..., 0] = self.hotpoints[..., 0].clip(0, w)
+            self.hotpoints[..., 1] = self.hotpoints[..., 1].clip(0, h)
 
-    def update(self, bboxes, segments=None, keypoints=None):
+    def update(self, bboxes, segments=None, keypoints=None, hotpoints=None):
         new_bboxes = Bboxes(bboxes, format=self._bboxes.format)
         self._bboxes = new_bboxes
         if segments is not None:
             self.segments = segments
         if keypoints is not None:
             self.keypoints = keypoints
+        if hotpoints is not None:
+            self.hotpoints = hotpoints
 
     def __len__(self):
         return len(self.bboxes)
@@ -324,13 +358,15 @@ class Instances:
             return instances_list[0]
 
         use_keypoint = instances_list[0].keypoints is not None
+        use_hotpoint = instances_list[0].hotpoints is not None
         bbox_format = instances_list[0]._bboxes.format
         normalized = instances_list[0].normalized
 
         cat_boxes = np.concatenate([ins.bboxes for ins in instances_list], axis=axis)
         cat_segments = np.concatenate([b.segments for b in instances_list], axis=axis)
         cat_keypoints = np.concatenate([b.keypoints for b in instances_list], axis=axis) if use_keypoint else None
-        return cls(cat_boxes, cat_segments, cat_keypoints, bbox_format, normalized)
+        cat_hotpoints = np.concatenate([b.hotpoints for b in instances_list], axis=axis) if use_hotpoint else None
+        return cls(cat_boxes, cat_segments, cat_keypoints, cat_hotpoints, bbox_format, normalized)
 
     @property
     def bboxes(self):

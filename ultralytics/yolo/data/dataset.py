@@ -36,9 +36,11 @@ class YOLODataset(BaseDataset):
                  single_cls=False,
                  use_segments=False,
                  use_keypoints=False,
+                 use_hotpoints=False,
                  names=None):
         self.use_segments = use_segments
         self.use_keypoints = use_keypoints
+        self.use_hotpoints = use_hotpoints
         self.names = names
         assert not (self.use_segments and self.use_keypoints), 'Can not use both segments and keypoints.'
         super().__init__(img_path, imgsz, cache, augment, hyp, prefix, rect, batch_size, stride, pad, single_cls)
@@ -52,9 +54,9 @@ class YOLODataset(BaseDataset):
         with ThreadPool(NUM_THREADS) as pool:
             results = pool.imap(func=verify_image_label,
                                 iterable=zip(self.im_files, self.label_files, repeat(self.prefix),
-                                             repeat(self.use_keypoints), repeat(len(self.names))))
+                                             repeat(self.use_keypoints),repeat(self.use_hotpoints), repeat(len(self.names))))
             pbar = tqdm(results, desc=desc, total=total, bar_format=TQDM_BAR_FORMAT)
-            for im_file, lb, shape, segments, keypoint, nm_f, nf_f, ne_f, nc_f, msg in pbar:
+            for im_file, lb, shape, segments, keypoint, hotpoints, nm_f, nf_f, ne_f, nc_f, msg in pbar:
                 nm += nm_f
                 nf += nf_f
                 ne += ne_f
@@ -68,6 +70,7 @@ class YOLODataset(BaseDataset):
                             bboxes=lb[:, 1:],  # n, 4
                             segments=segments,
                             keypoints=keypoint,
+                            hotpoints=hotpoints,
                             normalized=True,
                             bbox_format='xywh'))
                 if msg:
@@ -144,7 +147,7 @@ class YOLODataset(BaseDataset):
         transforms.append(
             Format(bbox_format='xywh',
                    normalize=True,
-                   return_mask=self.use_segments,
+                   return_mask=(self.use_segments or self.use_hotpoints),
                    return_keypoint=self.use_keypoints,
                    batch_idx=True,
                    mask_ratio=hyp.mask_ratio,
@@ -163,10 +166,11 @@ class YOLODataset(BaseDataset):
         # we can make it also support classification and semantic segmentation by add or remove some dict keys there.
         bboxes = label.pop('bboxes')
         segments = label.pop('segments')
+        hotpoints = label.pop('hotpoints')
         keypoints = label.pop('keypoints', None)
         bbox_format = label.pop('bbox_format')
         normalized = label.pop('normalized')
-        label['instances'] = Instances(bboxes, segments, keypoints, bbox_format=bbox_format, normalized=normalized)
+        label['instances'] = Instances(bboxes, segments, keypoints, hotpoints, bbox_format=bbox_format, normalized=normalized)
         return label
 
     @staticmethod

@@ -534,6 +534,23 @@ def resample_segments(segments, n=1000):
         segments[i] = np.concatenate([np.interp(x, xp, s[:, i]) for i in range(2)]).reshape(2, -1).T  # segment xy
     return segments
 
+def resample_hotpoints(hotpoints, n=100):
+    """
+    Inputs a list of hotpoints (n,3) and returns a list of hotpoints (n,3) up-sampled to n points each.
+
+    Args:
+      hotpoints (list): a list of (n,3) arrays, where n is the number of points in the segment.
+      n (int): number of points to resample the segment to. Defaults to 100
+
+    Returns:
+      segments (list): the resampled segments.
+    """
+    for i, s in enumerate(hotpoints):
+        nhpt = np.ones((n,3))*-1
+        ss = s.shape
+        nhpt[0:ss[0],0:ss[1]] = s
+        hotpoints[i] = nhpt
+    return hotpoints
 
 def crop_mask(masks, boxes):
     """

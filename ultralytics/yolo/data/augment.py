@@ -14,7 +14,7 @@ from ..utils.checks import check_version
 from ..utils.instance import Instances
 from ..utils.metrics import bbox_ioa
 from ..utils.ops import segment2box
-from .utils import IMAGENET_MEAN, IMAGENET_STD, polygons2masks, polygons2masks_overlap
+from .utils import IMAGENET_MEAN, IMAGENET_STD, polygons2masks, polygons2masks_overlap, hotpoints2masks
 
 
 # TODO: we might need a BaseTransform to make all these augments be compatible with both classification and semantic
@@ -331,6 +331,36 @@ class RandomPerspective:
         new_keypoints[:, list(range(1, 34, 2))] = y_kpts
         return new_keypoints.reshape(n, 17, 2)
 
+    def apply_hotpoints(self, hotpoints, M):
+        """apply affine to keypoints.
+
+        Args:
+            hotpoints(ndarray): keypoints, [N, 17, 2].
+            M(ndarray): affine matrix.
+        Return:
+            new_keypoints(ndarray): keypoints after affine, [N, 17, 2].
+        """
+        n = len(hotpoints)
+        if n == 0:
+            return hotpoints
+        # print(hotpoints.shape)
+        new_hotpoints = np.ones((n*100 , 3))
+        new_hotpoints_t = np.ones((n*100 , 3))
+        new_hotpoints[:, :2] = hotpoints.reshape(n*100 , 3)[:, :2]  # num_kpt is hardcoded to 17
+        new_hotpoints = new_hotpoints @ M.T  # transform
+        new_hotpoints = (new_hotpoints[:, :2] / new_hotpoints[:, 2:3]).reshape(n, 200)  # perspective rescale or affine
+
+        new_hotpoints[hotpoints.reshape(n*100 , 3)[:, :2].reshape(-1, 200) == -1] = 0
+        x_kpts = new_hotpoints[:, list(range(0, 200, 2))]
+        y_kpts = new_hotpoints[:, list(range(1, 200, 2))]
+
+        x_kpts[np.logical_or.reduce((x_kpts < 0, x_kpts > self.size[0], y_kpts < 0, y_kpts > self.size[1]))] = 0
+        y_kpts[np.logical_or.reduce((x_kpts < 0, x_kpts > self.size[0], y_kpts < 0, y_kpts > self.size[1]))] = 0
+        new_hotpoints[:, list(range(0, 200, 2))] = x_kpts
+        new_hotpoints[:, list(range(1, 200, 2))] = y_kpts
+        new_hotpoints_t[:, :2] = new_hotpoints.reshape(-1, 2)
+        new_hotpoints_t[:, 2] = hotpoints.reshape(n * 100, 3)[:, 2]
+        return new_hotpoints_t.reshape(n, 100, 3)
     def __call__(self, labels):
         """
         Affine images and targets.
@@ -358,14 +388,16 @@ class RandomPerspective:
         bboxes = self.apply_bboxes(instances.bboxes, M)
 
         segments = instances.segments
+        hotpoints = instances.hotpoints
         keypoints = instances.keypoints
         # update bboxes if there are segments.
         if len(segments):
             bboxes, segments = self.apply_segments(segments, M)
-
+        if len(hotpoints):
+            hotpoints = self.apply_hotpoints(hotpoints, M)
         if keypoints is not None:
             keypoints = self.apply_keypoints(keypoints, M)
-        new_instances = Instances(bboxes, segments, keypoints, bbox_format='xyxy', normalized=False)
+        new_instances = Instances(bboxes, segments, keypoints, hotpoints, bbox_format='xyxy', normalized=False)
         # clip
         new_instances.clip(*self.size)
 
@@ -645,19 +677,28 @@ class Format:
         img = torch.from_numpy(img)
         return img
 
+    # def _format_segments(self, instances, cls, w, h):
+    #     """convert polygon points to bitmap"""
+    #     segments = instances.segments
+    #     if self.mask_overlap:
+    #         masks, sorted_idx = polygons2masks_overlap((h, w), segments, downsample_ratio=self.mask_ratio)
+    #         masks = masks[None]  # (640, 640) -> (1, 640, 640)
+    #         instances = instances[sorted_idx]
+    #         cls = cls[sorted_idx]
+    #     else:
+    #         masks = polygons2masks((h, w), segments, color=1, downsample_ratio=self.mask_ratio)
+    #
+    #     return masks, instances, cls
+
     def _format_segments(self, instances, cls, w, h):
         """convert polygon points to bitmap"""
-        segments = instances.segments
-        if self.mask_overlap:
-            masks, sorted_idx = polygons2masks_overlap((h, w), segments, downsample_ratio=self.mask_ratio)
-            masks = masks[None]  # (640, 640) -> (1, 640, 640)
-            instances = instances[sorted_idx]
-            cls = cls[sorted_idx]
+        #
+        hotpoints = instances.hotpoints
+        if hotpoints.shape[0]>0:
+            masks = hotpoints2masks((h, w), hotpoints, color=1, downsample_ratio=self.mask_ratio)
         else:
-            masks = polygons2masks((h, w), segments, color=1, downsample_ratio=self.mask_ratio)
-
+            masks = np.zeros((len(instances.bboxes), int(h / self.mask_ratio), int(w / self.mask_ratio)))
         return masks, instances, cls
-
 
 def v8_transforms(dataset, imgsz, hyp):
     pre_transform = Compose([

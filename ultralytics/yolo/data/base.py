@@ -102,11 +102,14 @@ class BaseDataset(Dataset):
                 cls = self.labels[i]['cls']
                 bboxes = self.labels[i]['bboxes']
                 segments = self.labels[i]['segments']
+                hotpoints = self.labels[i]['hotpoints']
                 j = (cls == include_class_array).any(1)
                 self.labels[i]['cls'] = cls[j]
                 self.labels[i]['bboxes'] = bboxes[j]
                 if segments:
                     self.labels[i]['segments'] = segments[j]
+                if hotpoints:
+                    self.labels[i]['hotpoints'] = hotpoints[j]
             if self.single_cls:
                 self.labels[i]['cls'][:, 0] = 0
 

@@ -346,19 +346,35 @@ class Concat(nn.Module):
         return torch.cat(x, self.d)
 
 
+# class Proto(nn.Module):
+#     # YOLOv8 mask Proto module for segmentation models
+#     def __init__(self, c1, c_=256, c2=32):  # ch_in, number of protos, number of masks
+#         super().__init__()
+#         self.upsample1 = nn.ConvTranspose2d(c1, c1, 2, 2, 0, bias=True) 
+#         self.cv1 = Conv(c1, c_, k=3)
+#         self.upsample2 = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True)  # nn.Upsample(scale_factor=2, mode='nearest')
+#         self.cv2 = Conv(c_, c_, k=3)
+#         self.upsample3 = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True) 
+#         self.cv3 = Conv(c_, c2)
+
+#     def forward(self, x):
+#         return self.cv3(self.upsample3(self.cv2(self.upsample2(self.cv1(self.upsample1(x))))))
+
 class Proto(nn.Module):
     # YOLOv8 mask Proto module for segmentation models
     def __init__(self, c1, c_=256, c2=32):  # ch_in, number of protos, number of masks
         super().__init__()
+        self.upsample1 = nn.Upsample(scale_factor=2, mode='nearest')
         self.cv1 = Conv(c1, c_, k=3)
-        self.upsample = nn.ConvTranspose2d(c_, c_, 2, 2, 0, bias=True)  # nn.Upsample(scale_factor=2, mode='nearest')
+        self.upsample2 =  nn.Upsample(scale_factor=2, mode='nearest')
         self.cv2 = Conv(c_, c_, k=3)
+        self.upsample3 = nn.Upsample(scale_factor=2, mode='nearest')
         self.cv3 = Conv(c_, c2)
+        self.cv4 = Conv(c2, c2)
 
     def forward(self, x):
-        return self.cv3(self.cv2(self.upsample(self.cv1(x))))
-
-
+        return self.cv4(self.cv3(self.upsample3(self.cv2(self.upsample2(self.cv1(self.upsample1(x)))))))
+    
 class Ensemble(nn.ModuleList):
     # Ensemble of models
     def __init__(self):
@@ -442,6 +458,27 @@ class Segment(Detect):
             return x, mc, p
         return (torch.cat([x, mc], 1), p) if self.export else (torch.cat([x[0], mc], 1), (x[1], mc, p))
 
+class Hotpoint(Detect):
+    # YOLOv8 Segment head for segmentation models
+    def __init__(self, nc=80, nm=32, npr=256, ch=()):
+        super().__init__(nc, ch)
+        self.nm = nm  # number of masks
+        self.npr = npr  # number of protos
+        self.proto = Proto(ch[0], self.npr, self.nm)  # protos
+        self.detect = Detect.forward
+
+        c4 = max(ch[0] // 4, self.nm)
+        self.cv4 = nn.ModuleList(nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nm, 1)) for x in ch)
+
+    def forward(self, x):
+        p = self.proto(x[0])  # mask protos
+        bs = p.shape[0]  # batch size
+
+        mc = torch.cat([self.cv4[i](x[i]).view(bs, self.nm, -1) for i in range(self.nl)], 2)  # mask coefficients
+        x = self.detect(self, x)
+        if self.training:
+            return x, mc, p
+        return (torch.cat([x, mc], 1), p) if self.export else (torch.cat([x[0], mc], 1), (x[1], mc, p))
 
 class Classify(nn.Module):
     # YOLOv8 classification head, i.e. x(b,c1,20,20) to x(b,c2)

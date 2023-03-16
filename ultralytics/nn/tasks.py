@@ -11,7 +11,7 @@ import torch.nn as nn
 
 from ultralytics.nn.modules import (C1, C2, C3, C3TR, SPP, SPPF, Bottleneck, BottleneckCSP, C2f, C3Ghost, C3x, Classify,
                                     Concat, Conv, ConvTranspose, Detect, DWConv, DWConvTranspose2d, Ensemble, Focus,
-                                    GhostBottleneck, GhostConv, Segment)
+                                    GhostBottleneck, GhostConv, Segment, Hotpoint)
 from ultralytics.yolo.utils import DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, colorstr, yaml_load
 from ultralytics.yolo.utils.checks import check_requirements, check_yaml
 from ultralytics.yolo.utils.torch_utils import (fuse_conv_and_bn, fuse_deconv_and_bn, initialize_weights,
@@ -146,7 +146,7 @@ class BaseModel(nn.Module):
         """
         self = super()._apply(fn)
         m = self.model[-1]  # Detect()
-        if isinstance(m, (Detect, Segment)):
+        if isinstance(m, (Detect, Segment, Hotpoint)):
             m.stride = fn(m.stride)
             m.anchors = fn(m.anchors)
             m.strides = fn(m.strides)
@@ -180,10 +180,10 @@ class DetectionModel(BaseModel):
 
         # Build strides
         m = self.model[-1]  # Detect()
-        if isinstance(m, (Detect, Segment)):
+        if isinstance(m, (Detect, Segment, Hotpoint)):
             s = 256  # 2x min stride
             m.inplace = self.inplace
-            forward = lambda x: self.forward(x)[0] if isinstance(m, Segment) else self.forward(x)
+            forward = lambda x: self.forward(x)[0] if (isinstance(m, Segment) or isinstance(m, Hotpoint)) else self.forward(x)
             m.stride = torch.tensor([s / x.shape[-2] for x in forward(torch.zeros(1, ch, s, s))])  # forward
             self.stride = m.stride
             m.bias_init()  # only run once
@@ -250,7 +250,14 @@ class SegmentationModel(DetectionModel):
 
     def _forward_augment(self, x):
         raise NotImplementedError('WARNING ⚠️ SegmentationModel has not supported augment inference yet!')
+    
+class HotpointModel(DetectionModel):
+    # YOLOv8 hotpoint model
+    def __init__(self, cfg='yolov8n-hpt.yaml', ch=3, nc=None, verbose=True):
+        super().__init__(cfg, ch, nc, verbose)
 
+    def _forward_augment(self, x):
+        raise NotImplementedError('WARNING ⚠️ HotpointModel has not supported augment inference yet!')
 
 class ClassificationModel(BaseModel):
     # YOLOv8 classification model
@@ -372,7 +379,7 @@ def attempt_load_weights(weights, device=None, inplace=True, fuse=False):
     # Module compatibility updates
     for m in ensemble.modules():
         t = type(m)
-        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Segment):
+        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Segment, Hotpoint):
             m.inplace = inplace  # torch 1.7.0 compatibility
         elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
             m.recompute_scale_factor = None  # torch 1.11.0 compatibility
@@ -408,7 +415,7 @@ def attempt_load_one_weight(weight, device=None, inplace=True, fuse=False):
     # Module compatibility updates
     for m in model.modules():
         t = type(m)
-        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Segment):
+        if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Segment, Hotpoint):
             m.inplace = inplace  # torch 1.7.0 compatibility
         elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
             m.recompute_scale_factor = None  # torch 1.11.0 compatibility
@@ -452,9 +459,11 @@ def parse_model(d, ch, verbose=True):  # model_dict, input_channels(3)
             args = [ch[f]]
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
-        elif m in {Detect, Segment}:
+        elif m in {Detect, Segment, Hotpoint}:
             args.append([ch[x] for x in f])
             if m is Segment:
+                args[2] = make_divisible(args[2] * gw, 8)
+            if m is Hotpoint:
                 args[2] = make_divisible(args[2] * gw, 8)
         else:
             c2 = ch[f]
@@ -496,6 +505,8 @@ def guess_model_task(model):
             return 'detect'
         if m in ['segment']:
             return 'segment'
+        if m in ['hotpoint']:
+            return 'hotpoint'
 
     # Guess from model cfg
     if isinstance(model, dict):
@@ -518,12 +529,16 @@ def guess_model_task(model):
                 return 'segment'
             elif isinstance(m, Classify):
                 return 'classify'
+            elif isinstance(m, Hotpoint):
+                return 'hotpoint'
 
     # Guess from model filename
     if isinstance(model, (str, Path)):
         model = Path(model).stem
         if '-seg' in model:
             return 'segment'
+        if '-hpt' in model:
+            return 'hotpoint'
         elif '-cls' in model:
             return 'classify'
         else:
@@ -531,4 +546,4 @@ def guess_model_task(model):
 
     # Unable to determine task from model
     raise SyntaxError('YOLO is unable to automatically guess model task. Explicitly define task for your model, '
-                      "i.e. 'task=detect', 'task=segment' or 'task=classify'.")
+                      "i.e. 'task=detect', 'task=segment', 'task=hotpoint' or 'task=classify'.")

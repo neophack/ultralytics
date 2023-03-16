@@ -82,6 +82,7 @@ def build_dataloader(cfg, batch, img_path, stride=32, rect=False, names=None, ra
             prefix=colorstr(f'{mode}: '),
             use_segments=cfg.task == 'segment',
             use_keypoints=cfg.task == 'keypoint',
+            use_hotpoints=cfg.task == 'hotpoint',
             names=names)
 
     batch = min(batch, len(dataset))

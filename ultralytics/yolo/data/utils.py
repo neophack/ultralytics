@@ -59,9 +59,9 @@ def exif_size(img):
 
 def verify_image_label(args):
     # Verify one image-label pair
-    im_file, lb_file, prefix, keypoint, num_cls = args
+    im_file, lb_file, prefix, keypoint, hotpoint, num_cls = args
     # number (missing, found, empty, corrupt), message, segments, keypoints
-    nm, nf, ne, nc, msg, segments, keypoints = 0, 0, 0, 0, '', [], None
+    nm, nf, ne, nc, msg, segments, keypoints, hotpoints = 0, 0, 0, 0, '', [], None, []
     try:
         # verify images
         im = Image.open(im_file)
@@ -82,7 +82,11 @@ def verify_image_label(args):
             nf = 1  # label found
             with open(lb_file) as f:
                 lb = [x.split() for x in f.read().strip().splitlines() if len(x)]
-                if any(len(x) > 6 for x in lb) and (not keypoint):  # is segment
+                if any(len(x) > 5 for x in lb) and hotpoint:
+                    classes = np.array([x[0] for x in lb], dtype=np.float32)
+                    hotpoints = [np.array(x[5:-1], dtype=np.float32).reshape(-1, 3) for x in lb]
+                    lb = [np.array(x[0:5], dtype=np.float32) for x in lb]
+                elif any(len(x) > 6 for x in lb) and (not keypoint):  # is segment
                     classes = np.array([x[0] for x in lb], dtype=np.float32)
                     segments = [np.array(x[1:], dtype=np.float32).reshape(-1, 2) for x in lb]  # (cls, xy1...)
                     lb = np.concatenate((classes.reshape(-1, 1), segments2boxes(segments)), 1)  # (cls, xywh)
@@ -114,7 +118,10 @@ def verify_image_label(args):
                     lb = lb[i]  # remove duplicates
                     if segments:
                         segments = [segments[x] for x in i]
+                    if hotpoint:
+                        hotpoints = [hotpoints[x] for x in i]
                     msg = f'{prefix}WARNING ⚠️ {im_file}: {nl - len(i)} duplicate labels removed'
+                    
             else:
                 ne = 1  # label empty
                 lb = np.zeros((0, 39), dtype=np.float32) if keypoint else np.zeros((0, 5), dtype=np.float32)
@@ -124,11 +131,11 @@ def verify_image_label(args):
         if keypoint:
             keypoints = lb[:, 5:].reshape(-1, 17, 2)
         lb = lb[:, :5]
-        return im_file, lb, shape, segments, keypoints, nm, nf, ne, nc, msg
+        return im_file, lb, shape, segments, keypoints, hotpoints, nm, nf, ne, nc, msg
     except Exception as e:
         nc = 1
         msg = f'{prefix}WARNING ⚠️ {im_file}: ignoring corrupt image/label: {e}'
-        return [None, None, None, None, None, nm, nf, ne, nc, msg]
+        return [None, None, None, None, None, None, nm, nf, ne, nc, msg]
 
 
 def polygon2mask(imgsz, polygons, color=1, downsample_ratio=1):
@@ -151,6 +158,30 @@ def polygon2mask(imgsz, polygons, color=1, downsample_ratio=1):
     mask = cv2.resize(mask, (nw, nh))
     return mask
 
+def points2mask(imgsz, hotpoints, color=1, downsample_ratio=1):
+    """
+    Args:
+        imgsz (tuple): The image size.
+        polygons (np.ndarray): [N, M], N is the number of polygons, M is the number of points(Be divided by 2).
+        color (int): color
+        downsample_ratio (int): downsample ratio
+    """
+    mask = np.zeros(imgsz, dtype=np.uint8)
+    hotpoints = np.asarray(hotpoints)
+    hotpoints = hotpoints.astype(np.int32)
+
+    hotpoints = hotpoints.reshape( -1, 3)
+    shape = hotpoints.shape
+    # cv2.fillPoly(mask, polygons, color=color)
+    for i in range(shape[0]):
+        cv2.circle(mask,hotpoints[i,:2],1,color,-1)
+    nh, nw = (imgsz[0] // downsample_ratio, imgsz[1] // downsample_ratio)
+    # NOTE: fillPoly firstly then resize is trying the keep the same way
+    # of loss calculation when mask-ratio=1.
+    # cv2.imshow("mask",mask)
+    # cv2.waitKey()
+    mask = cv2.resize(mask, (nw, nh))
+    return mask
 
 def polygons2masks(imgsz, polygons, color, downsample_ratio=1):
     """
@@ -166,6 +197,19 @@ def polygons2masks(imgsz, polygons, color, downsample_ratio=1):
         masks.append(mask)
     return np.array(masks)
 
+def hotpoints2masks(imgsz, hotpoints, color, downsample_ratio=1):
+    """
+    Args:
+        imgsz (tuple): The image size.
+        polygons (list[np.ndarray]): each polygon is [N, M], N is number of polygons, M is number of points (M % 2 = 0)
+        color (int): color
+        downsample_ratio (int): downsample ratio
+    """
+    masks = []
+    for si in range(len(hotpoints)):
+        mask = points2mask(imgsz, [hotpoints[si].reshape(-1)], color, downsample_ratio)
+        masks.append(mask)
+    return np.array(masks)
 
 def polygons2masks_overlap(imgsz, segments, downsample_ratio=1):
     """Return a (640, 640) overlap mask."""

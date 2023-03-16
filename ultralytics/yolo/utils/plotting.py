@@ -256,6 +256,7 @@ def plot_images(images,
                     image_masks = np.repeat(image_masks, nl, axis=0)
                     image_masks = np.where(image_masks == index, 1.0, 0.0)
                 else:
+                    # print(masks.shape,idx)
                     image_masks = masks[idx]
 
                 im = np.asarray(annotator.im).copy()
