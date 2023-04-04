@@ -91,6 +91,10 @@ def on_predict_batch_end(predictor):
     pass
 
 
+def on_predict_postprocess_end(predictor):
+    pass
+
+
 def on_predict_end(predictor):
     pass
 
@@ -130,6 +134,7 @@ default_callbacks = {
     # Run in predictor
     'on_predict_start': [on_predict_start],
     'on_predict_batch_start': [on_predict_batch_start],
+    'on_predict_postprocess_end': [on_predict_postprocess_end],
     'on_predict_batch_end': [on_predict_batch_end],
     'on_predict_end': [on_predict_end],
 
@@ -142,8 +147,10 @@ def add_integration_callbacks(instance):
     from .clearml import callbacks as clearml_callbacks
     from .comet import callbacks as comet_callbacks
     from .hub import callbacks as hub_callbacks
+    from .mlflow import callbacks as mf_callbacks
     from .tensorboard import callbacks as tb_callbacks
 
-    for x in clearml_callbacks, comet_callbacks, hub_callbacks, tb_callbacks:
+    for x in clearml_callbacks, comet_callbacks, hub_callbacks, tb_callbacks, mf_callbacks:
         for k, v in x.items():
-            instance.callbacks[k].append(v)  # callback[name].append(func)
+            if v not in instance.callbacks[k]:  # prevent duplicate callbacks addition
+                instance.callbacks[k].append(v)  # callback[name].append(func)
