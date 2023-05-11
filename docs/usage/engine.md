@@ -1,3 +1,8 @@
+---
+comments: true
+description: Learn how to train and customize your models fast with the Ultralytics YOLO 'DetectionTrainer' and 'CustomTrainer'. Read more here!
+---
+
 Both the Ultralytics YOLO command-line and python interfaces are simply a high-level abstraction on the base engine
 executors. Let's take a look at the Trainer engine.
 
@@ -9,7 +14,7 @@ custom model and dataloader by just overriding these functions:
 
 * `get_model(cfg, weights)` - The function that builds the model to be trained
 * `get_dataloder()` - The function that builds the dataloader
-  More details and source code can be found in [`BaseTrainer` Reference](../reference/base_trainer.md)
+  More details and source code can be found in [`BaseTrainer` Reference](../reference/yolo/engine/trainer.md)
 
 ## DetectionTrainer
 
@@ -74,10 +79,9 @@ trainer.add_callback("on_train_epoch_end", log_model)  # Adds to existing callba
 trainer.train()
 ```
 
-To know more about Callback triggering events and entry point, checkout our Callbacks guide # TODO
+To know more about Callback triggering events and entry point, checkout our [Callbacks Guide](callbacks.md)
 
 ## Other engine components
 
 There are other components that can be customized similarly like `Validators` and `Predictors`
 See Reference section for more information on these.
-
