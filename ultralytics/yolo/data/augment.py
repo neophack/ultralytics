@@ -220,6 +220,7 @@ class RandomPerspective:
         self.pre_transform = pre_transform
 
     def affine_transform(self, img, border):
+        self.degrees = 3
         # Center
         C = np.eye(3)
 
@@ -441,6 +442,18 @@ class RandomFlip:
         labels['instances'] = instances
         return labels
 
+class EnlargeBboxes:
+
+    def __init__(self, factor=2, nc=2) -> None:
+        self.factor=factor
+        self.nc=nc
+
+    def __call__(self, labels):
+        instances = labels.pop('instances')
+        instances.convert_bbox(format='xywh')
+        instances.enlarge_bboxes(self.factor,self.nc)
+        labels['instances'] = instances
+        return labels
 
 class LetterBox:
     """Resize image and padding for detection, instance segmentation, pose"""
@@ -562,9 +575,9 @@ class Albumentations:
                 A.MedianBlur(p=0.01),
                 A.ToGray(p=0.01),
                 A.CLAHE(p=0.01),
-                A.RandomBrightnessContrast(p=0.0),
-                A.RandomGamma(p=0.0),
-                A.ImageCompression(quality_lower=75, p=0.0)]  # transforms
+                A.RandomBrightnessContrast(p=0.01),
+                A.RandomGamma(p=0.01),
+                A.ImageCompression(quality_lower=75, p=0.01)]  # transforms
             self.transform = A.Compose(T, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
 
             LOGGER.info(prefix + ', '.join(f'{x}'.replace('always_apply=False, ', '') for x in T if x.p))
@@ -587,6 +600,20 @@ class Albumentations:
                     labels['img'] = new['image']
                     labels['cls'] = np.array(new['class_labels'])
                     bboxes = np.array(new['bboxes'])
+            # factor neo
+            x_c = bboxes[:, 0].copy()
+            y_c = bboxes[:, 1].copy()
+            w = bboxes[:, 2].copy()
+            h = bboxes[:, 3].copy()
+            w_new = w * 2
+            h_new = h * 2
+            x_c_new = x_c
+            y_c_new = y_c
+            bboxes_new = np.stack((x_c_new, y_c_new, w_new, h_new), axis=1)
+
+            bboxes = np.concatenate((bboxes, bboxes_new), axis=0)
+            labels['cls'] = np.concatenate((labels['cls'], labels['cls']+2), axis=0)
+
             labels['instances'].update(bboxes=bboxes)
         return labels
 
@@ -662,7 +689,7 @@ class Format:
 
 def v8_transforms(dataset, imgsz, hyp):
     pre_transform = Compose([
-        Mosaic(dataset, imgsz=imgsz, p=hyp.mosaic, border=[-imgsz // 2, -imgsz // 2]),
+        Mosaic(dataset, imgsz=imgsz, p=hyp.mosaic/3, border=[-imgsz // 2, -imgsz // 2]),
         CopyPaste(p=hyp.copy_paste),
         RandomPerspective(
             degrees=hyp.degrees,

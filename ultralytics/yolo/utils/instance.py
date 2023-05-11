@@ -265,6 +265,64 @@ class Instances:
         self.segments[..., 1] = h - self.segments[..., 1]
         if self.keypoints is not None:
             self.keypoints[..., 1] = h - self.keypoints[..., 1]
+    
+    def enlarge_bboxes(self, factor, nc=2):
+        if self._bboxes.format == 'xyxy':
+            x1 = self.bboxes[:, 0].copy()
+            y1 = self.bboxes[:, 1].copy()
+            x2 = self.bboxes[:, 2].copy()
+            y2 = self.bboxes[:, 3].copy()
+            w = x2 - x1
+            h = y2 - y1
+            x1_new = x1 - w * (factor - 1) / 2
+            y1_new = y1 - h * (factor - 1) / 2
+            x2_new = x2 + w * (factor - 1) / 2
+            y2_new = y2 + h * (factor - 1) / 2
+            bboxes_new = np.stack((x1_new, y1_new, x2_new, y2_new), axis=1)
+            enlarged_bboxes = np.concatenate((self.bboxes, bboxes_new), axis=0)
+            self.bboxes = enlarged_bboxes.copy()
+            enlarged_labels = np.concatenate((self.labels, self.labels+nc), axis=0)
+            self.labels = enlarged_labels.copy()
+            # self.bboxes = np.concatenate((self.bboxes, bboxes_new), axis=0)
+            # self.labels = np.concatenate((self.labels, self.labels+nc), axis=0)
+
+        elif self._bboxes.format == 'xywh':
+            x_c = self.bboxes[:, 0].copy()
+            y_c = self.bboxes[:, 1].copy()
+            w = self.bboxes[:, 2].copy()
+            h = self.bboxes[:, 3].copy()
+            w_new = w * factor
+            h_new = h * factor
+            x_c_new = x_c
+            y_c_new = y_c
+            bboxes_new = np.stack((x_c_new, y_c_new, w_new, h_new), axis=1)
+            print(self.bboxes.shape, np.concatenate((self.bboxes, bboxes_new), axis=0).shape)
+            enlarged_bboxes = np.concatenate((self.bboxes, bboxes_new), axis=0)
+            self.bboxes = enlarged_bboxes.copy()
+            enlarged_labels = np.concatenate((self.labels, self.labels+nc), axis=0)
+            self.labels = enlarged_labels.copy()
+            # self.bboxes = np.concatenate((self.bboxes, bboxes_new), axis=0)
+            # self.labels = np.concatenate((self.labels, self.labels+nc), axis=0)
+
+        if self.segments is not None:
+            for i in range(len(self.segments)):
+                x = self.segments[i, :, 0].copy()
+                y = self.segments[i, :, 1].copy()
+                x_c = np.mean(x)
+                y_c = np.mean(y)
+                x_new = x_c + factor * (x - x_c)
+                y_new = y_c + factor * (y - y_c)
+                self.segments[i] = np.concatenate((self.segments[i], np.stack((x_new, y_new), axis=1)), axis=0)
+
+        if self.keypoints is not None:
+            for i in range(len(self.keypoints)):
+                x = self.keypoints[i, :, 0].copy()
+                y = self.keypoints[i, :, 1].copy()
+                x_c = np.mean(x)
+                y_c = np.mean(y)
+                x_new = x_c + factor * (x - x_c)
+                y_new = y_c + factor * (y - y_c)
+                self.keypoints[i] = np.concatenate((self.keypoints[i], np.stack((x_new, y_new), axis=1)), axis=0)
 
     def fliplr(self, w):
         if self._bboxes.format == 'xyxy':

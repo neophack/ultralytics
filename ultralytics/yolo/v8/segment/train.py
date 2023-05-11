@@ -133,9 +133,9 @@ class SegLoss(Loss):
             loss[1] += (proto * 0).sum() + (pred_masks * 0).sum()  # inf sums may lead to nan loss
 
         loss[0] *= self.hyp.box  # box gain
-        loss[1] *= self.hyp.box / batch_size  # seg gain
-        loss[2] *= self.hyp.cls  # cls gain
-        loss[3] *= self.hyp.dfl  # dfl gain
+        loss[1] *= self.hyp.box*0.3 / batch_size  # seg gain
+        loss[2] *= self.hyp.cls*1.5  # cls gain
+        loss[3] *= self.hyp.dfl*0.3  # dfl gain
 
         return loss.sum() * batch_size, loss.detach()  # loss(box, cls, dfl)
 
