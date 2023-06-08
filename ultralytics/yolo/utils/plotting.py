@@ -343,28 +343,38 @@ def plot_images(images,
     # Annotate
     fs = int((h + w) * ns * 0.01)  # font size
     annotator = Annotator(mosaic, line_width=round(fs / 10), font_size=fs, pil=True, example=names)
-    for i in range(i + 1):
+    for i in range(len(images)):
         x, y = int(w * (i // ns)), int(h * (i % ns))  # block origin
         annotator.rectangle([x, y, x + w, y + h], None, (255, 255, 255), width=2)  # borders
         if paths:
             annotator.text((x + 5, y + 5), text=Path(paths[i]).name[:40], txt_color=(220, 220, 220))  # filenames
+        # if len(cls)==0:
+        # print(Path(paths[i]).name)
+        # if Path(paths[i]).name.count("shi-jie-di-xia")>0:
+        #     print(Path(paths[i]).name,bboxes[idx, :4],cls)
+            # assert 1==0
         if len(cls) > 0:
             idx = batch_idx == i
             classes = cls[idx].astype('int')
-
+            
             if len(bboxes):
                 boxes = xywh2xyxy(bboxes[idx, :4]).T
+                
                 labels = bboxes.shape[1] == 4  # labels if no conf column
                 conf = None if labels else bboxes[idx, 4]  # check for confidence presence (label vs pred)
-
+                # if Path(paths[i]).name.count("shi-jie-di-xia")>0 :
+                #     print(Path(paths[i]).name,boxes.shape[1],boxes.max() <= 1.01,boxes[[0, 2]] * w,scale)
                 if boxes.shape[1]:
-                    if boxes.max() <= 1.01:  # if normalized with tolerance 0.01
+                    if boxes.max() <= 1.51:  # if normalized with tolerance 0.01
                         boxes[[0, 2]] *= w  # scale to pixels
                         boxes[[1, 3]] *= h
                     elif scale < 1:  # absolute coords need scale if image scales
                         boxes *= scale
+                # if Path(paths[i]).name.count("shi-jie-di-xia")>0 :
+                #     print(Path(paths[i]).name,boxes)
                 boxes[[0, 2]] += x
                 boxes[[1, 3]] += y
+                
                 for j, box in enumerate(boxes.T.tolist()):
                     c = classes[j]
                     color = colors(c)
@@ -372,6 +382,8 @@ def plot_images(images,
                     if labels or conf[j] > 0.25:  # 0.25 conf thresh
                         label = f'{c}' if labels else f'{c} {conf[j]:.1f}'
                         annotator.box_label(box, label, color=color)
+                        # if Path(paths[i]).name.count("shi-jie-di-xia")>0 :
+                        #     print(Path(paths[i]).name,box, label)
             elif len(classes):
                 for c in classes:
                     color = colors(c)

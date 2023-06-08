@@ -466,6 +466,10 @@ class RandomFlip:
             # For keypoints
             if self.flip_idx is not None and instances.keypoints is not None:
                 instances.keypoints = np.ascontiguousarray(instances.keypoints[:, self.flip_idx, :])
+        # bboxes=instances.bboxes
+        # print(bboxes.shape)
+        # if(bboxes.shape[0]==0):
+        #     assert 1==0
         labels['img'] = np.ascontiguousarray(img)
         labels['instances'] = instances
         return labels
@@ -632,6 +636,7 @@ class Albumentations:
                     labels['img'] = new['image']
                     labels['cls'] = np.array(new['class_labels'])
                     bboxes = np.array(new['bboxes'])
+            
             # factor neo
             x_c = bboxes[:, 0].copy()
             y_c = bboxes[:, 1].copy()
@@ -642,9 +647,14 @@ class Albumentations:
             x_c_new = x_c
             y_c_new = y_c
             bboxes_new = np.stack((x_c_new, y_c_new, w_new, h_new), axis=1)
+            w_new = w * 4
+            h_new = h * 4
+            x_c_new = x_c
+            y_c_new = y_c
+            bboxes_new2 = np.stack((x_c_new, y_c_new, w_new, h_new), axis=1)
 
-            bboxes = np.concatenate((bboxes, bboxes_new), axis=0)
-            labels['cls'] = np.concatenate((labels['cls'], labels['cls']+2), axis=0)
+            bboxes = np.concatenate((np.concatenate((bboxes, bboxes_new), axis=0), bboxes_new2), axis=0)
+            labels['cls'] = np.concatenate((np.concatenate((labels['cls'], labels['cls']+2), axis=0), labels['cls']+4), axis=0)
 
             labels['instances'].update(bboxes=bboxes)
         return labels

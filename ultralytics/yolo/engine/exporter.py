@@ -289,7 +289,7 @@ class Exporter:
         return f, None
 
     @try_export
-    def _export_onnx(self, prefix=colorstr('ONNX:')):
+    def export_onnx(self, prefix=colorstr('ONNX:')):
         # YOLOv8 ONNX export
 
         requirements = ['onnx>=1.12.0']

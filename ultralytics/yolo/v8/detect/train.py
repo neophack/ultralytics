@@ -66,7 +66,7 @@ class DetectionTrainer(BaseTrainer):
 
     def preprocess_batch(self, batch):
         """Preprocesses a batch of images by scaling and converting to float."""
-        batch['img'] = batch['img'].to(self.device, non_blocking=True).float() / 255
+        batch['img'] = batch['img'].to(self.device, non_blocking=True).float() #/ 255
         return batch
 
     def set_model_attributes(self):
@@ -153,7 +153,7 @@ class Loss:
 
         self.use_dfl = m.reg_max > 1
 
-        self.assigner = TaskAlignedAssigner(topk=10, num_classes=self.nc, alpha=0.5, beta=6.0)
+        self.assigner = TaskAlignedAssigner(topk=20, num_classes=self.nc, alpha=1.5, beta=6.0)
         self.bbox_loss = BboxLoss(m.reg_max - 1, use_dfl=self.use_dfl).to(device)
         self.proj = torch.arange(m.reg_max, dtype=torch.float, device=device)
 

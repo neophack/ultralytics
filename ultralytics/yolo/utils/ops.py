@@ -110,7 +110,7 @@ def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None):
     boxes[..., [0, 2]] -= pad[0]  # x padding
     boxes[..., [1, 3]] -= pad[1]  # y padding
     boxes[..., :4] /= gain
-    clip_boxes(boxes, img0_shape)
+    # clip_boxes(boxes, img0_shape)
     return boxes
 
 
@@ -278,8 +278,8 @@ def clip_boxes(boxes, shape):
         boxes[..., 2].clamp_(0, shape[1])  # x2
         boxes[..., 3].clamp_(0, shape[0])  # y2
     else:  # np.array (faster grouped)
-        boxes[..., [0, 2]] = boxes[..., [0, 2]].clip(0, shape[1])  # x1, x2
-        boxes[..., [1, 3]] = boxes[..., [1, 3]].clip(0, shape[0])  # y1, y2
+        boxes[..., [0, 2]] = boxes[..., [0, 2]]#.clip(0, shape[1])  # x1, x2
+        boxes[..., [1, 3]] = boxes[..., [1, 3]]#.clip(0, shape[0])  # y1, y2
 
 
 def clip_coords(coords, shape):
@@ -297,8 +297,8 @@ def clip_coords(coords, shape):
         coords[..., 0].clamp_(0, shape[1])  # x
         coords[..., 1].clamp_(0, shape[0])  # y
     else:  # np.array (faster grouped)
-        coords[..., 0] = coords[..., 0].clip(0, shape[1])  # x
-        coords[..., 1] = coords[..., 1].clip(0, shape[0])  # y
+        coords[..., 0] = coords[..., 0]#.clip(0, shape[1])  # x
+        coords[..., 1] = coords[..., 1]#.clip(0, shape[0])  # y
 
 
 def scale_image(masks, im0_shape, ratio_pad=None):
